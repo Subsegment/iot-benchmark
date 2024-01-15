@@ -31,7 +31,15 @@ import cn.edu.tsinghua.iot.benchmark.tsdb.DBConfig;
 import cn.edu.tsinghua.iot.benchmark.tsdb.IDatabase;
 import cn.edu.tsinghua.iot.benchmark.tsdb.TsdbException;
 import cn.edu.tsinghua.iot.benchmark.utils.TimeUtils;
-import cn.edu.tsinghua.iot.benchmark.workload.query.impl.*;
+import cn.edu.tsinghua.iot.benchmark.workload.query.impl.PreciseQuery;
+import cn.edu.tsinghua.iot.benchmark.workload.query.impl.RangeQuery;
+import cn.edu.tsinghua.iot.benchmark.workload.query.impl.ValueRangeQuery;
+import cn.edu.tsinghua.iot.benchmark.workload.query.impl.AggValueQuery;
+import cn.edu.tsinghua.iot.benchmark.workload.query.impl.AggRangeValueQuery;
+import cn.edu.tsinghua.iot.benchmark.workload.query.impl.AggRangeQuery;
+import cn.edu.tsinghua.iot.benchmark.workload.query.impl.GroupByQuery;
+import cn.edu.tsinghua.iot.benchmark.workload.query.impl.LatestPointQuery;
+import cn.edu.tsinghua.iot.benchmark.workload.query.impl.VerificationQuery;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient.Builder;
@@ -132,10 +140,6 @@ public class CnosDB implements IDatabase {
         model =
             createDataModel(
                 batch.getDeviceSchema(), record.getTimestamp(), record.getRecordDataValue());
-        //        OpenOption[] options = {StandardOpenOption.CREATE, StandardOpenOption.APPEND};
-        //        Path path = Paths.get("/tmp/test_write_iotbenchmark");
-        //        Files.write(path, (model.toString() + "\n").getBytes(StandardCharsets.UTF_8),
-        // options);
         batchPoints.point(model.toInfluxPoint());
       }
 
