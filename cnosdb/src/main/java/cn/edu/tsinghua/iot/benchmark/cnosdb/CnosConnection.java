@@ -3,9 +3,9 @@ package cn.edu.tsinghua.iot.benchmark.cnosdb;
 import okhttp3.ConnectionPool;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
-import okhttp3.Response;
-import okhttp3.RequestBody;
 import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
