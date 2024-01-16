@@ -291,7 +291,6 @@ public class CnosDB extends InfluxDB implements IDatabase {
     String sql = getAggQuerySqlHead(groupByQuery.getDeviceSchema(), groupByQuery.getAggFun());
     sql = addWhereTimeClause(sql, groupByQuery);
     sql = addGroupByClause(sql, groupByQuery.getGranularity());
-    sql = addDescClause(sql);
     return addTailClausesAndExecuteQueryAndGetStatus(sql);
   }
 
