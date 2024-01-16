@@ -24,6 +24,7 @@ import cn.edu.tsinghua.iot.benchmark.conf.ConfigDescriptor;
 import cn.edu.tsinghua.iot.benchmark.entity.Batch.IBatch;
 import cn.edu.tsinghua.iot.benchmark.entity.Record;
 import cn.edu.tsinghua.iot.benchmark.entity.Sensor;
+import cn.edu.tsinghua.iot.benchmark.influxdb.InfluxDB;
 import cn.edu.tsinghua.iot.benchmark.influxdb.InfluxDataModel;
 import cn.edu.tsinghua.iot.benchmark.measurement.Status;
 import cn.edu.tsinghua.iot.benchmark.schema.schemaImpl.DeviceSchema;
@@ -31,7 +32,15 @@ import cn.edu.tsinghua.iot.benchmark.tsdb.DBConfig;
 import cn.edu.tsinghua.iot.benchmark.tsdb.IDatabase;
 import cn.edu.tsinghua.iot.benchmark.tsdb.TsdbException;
 import cn.edu.tsinghua.iot.benchmark.utils.TimeUtils;
-import cn.edu.tsinghua.iot.benchmark.workload.query.impl.*;
+import cn.edu.tsinghua.iot.benchmark.workload.query.impl.AggRangeQuery;
+import cn.edu.tsinghua.iot.benchmark.workload.query.impl.AggRangeValueQuery;
+import cn.edu.tsinghua.iot.benchmark.workload.query.impl.AggValueQuery;
+import cn.edu.tsinghua.iot.benchmark.workload.query.impl.GroupByQuery;
+import cn.edu.tsinghua.iot.benchmark.workload.query.impl.LatestPointQuery;
+import cn.edu.tsinghua.iot.benchmark.workload.query.impl.PreciseQuery;
+import cn.edu.tsinghua.iot.benchmark.workload.query.impl.RangeQuery;
+import cn.edu.tsinghua.iot.benchmark.workload.query.impl.ValueRangeQuery;
+import cn.edu.tsinghua.iot.benchmark.workload.query.impl.VerificationQuery;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient.Builder;
@@ -44,15 +53,13 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-public class CnosDB implements IDatabase {
+public class CnosDB extends InfluxDB implements IDatabase {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CnosDB.class);
   private static Config config = ConfigDescriptor.getInstance().getConfig();
@@ -66,6 +73,7 @@ public class CnosDB implements IDatabase {
 
   /** constructor. */
   public CnosDB(DBConfig dbConfig) {
+    super(dbConfig);
     cnosUrl = "http://" + dbConfig.getHOST().get(0) + ":" + dbConfig.getPORT().get(0);
     cnosDbName = dbConfig.getDB_NAME();
   }
@@ -113,7 +121,9 @@ public class CnosDB implements IDatabase {
       start = System.nanoTime();
       Response response =
           cnosConnection.execute(
-              String.format("create database if not exists %s with shard 32", cnosDbName));
+              String.format(
+                  "create database if not exists %s with shard %d",
+                  cnosDbName, config.getCNOSDB_SHARD_NUMBER()));
       response.close();
       end = System.nanoTime();
     } catch (Exception e) {
@@ -132,10 +142,6 @@ public class CnosDB implements IDatabase {
         model =
             createDataModel(
                 batch.getDeviceSchema(), record.getTimestamp(), record.getRecordDataValue());
-        //        OpenOption[] options = {StandardOpenOption.CREATE, StandardOpenOption.APPEND};
-        //        Path path = Paths.get("/tmp/test_write_iotbenchmark");
-        //        Files.write(path, (model.toString() + "\n").getBytes(StandardCharsets.UTF_8),
-        // options);
         batchPoints.point(model.toInfluxPoint());
       }
 
@@ -324,41 +330,6 @@ public class CnosDB implements IDatabase {
     }
   }
 
-  private static String getPreciseQuerySql(PreciseQuery preciseQuery) {
-    String strTime = "" + preciseQuery.getTimestamp() * TIMESTAMP_TO_NANO;
-    return getSimpleQuerySqlHead(preciseQuery.getDeviceSchema()) + " AND time = " + strTime;
-  }
-
-  /**
-   * add time filter for query statements.
-   *
-   * @param sql sql header
-   * @param rangeQuery range query
-   * @return sql with time filter
-   */
-  private static String addWhereTimeClause(String sql, RangeQuery rangeQuery) {
-    String startTime = "" + rangeQuery.getStartTimestamp() * TIMESTAMP_TO_NANO;
-    String endTime = "" + rangeQuery.getEndTimestamp() * TIMESTAMP_TO_NANO;
-    return sql + " AND time >= " + startTime + " AND time <= " + endTime;
-  }
-
-  /**
-   * add value filter for query statements.
-   *
-   * @param devices query device schema
-   * @param sqlHeader sql header
-   * @param valueThreshold lower bound of query value filter
-   * @return sql with value filter
-   */
-  private static String addWhereValueClause(
-      List<DeviceSchema> devices, String sqlHeader, double valueThreshold) {
-    StringBuilder builder = new StringBuilder(sqlHeader);
-    for (Sensor sensor : devices.get(0).getSensors()) {
-      builder.append(" AND ").append(sensor.getName()).append(" > ").append(valueThreshold);
-    }
-    return builder.toString();
-  }
-
   /**
    * add group by clause for query.
    *
@@ -433,33 +404,6 @@ public class CnosDB implements IDatabase {
     }
 
     builder.append(generateConstrainForDevices(devices));
-    return builder.toString();
-  }
-
-  /**
-   * generate from and where clause for specified devices.
-   *
-   * @param devices schema list of query devices
-   * @return from and where clause
-   */
-  private static String generateConstrainForDevices(List<DeviceSchema> devices) {
-    StringBuilder builder = new StringBuilder();
-    Set<String> groups = new HashSet<>();
-    for (DeviceSchema d : devices) {
-      groups.add(d.getGroup());
-    }
-    builder.append(" FROM ");
-    for (String g : groups) {
-      builder.append(g).append(" , ");
-    }
-    builder.deleteCharAt(builder.lastIndexOf(","));
-    builder.append("WHERE (");
-    for (DeviceSchema d : devices) {
-      builder.append(" device = '").append(d.getDevice()).append("' OR");
-    }
-    builder.delete(builder.lastIndexOf("OR"), builder.length());
-    builder.append(")");
-
     return builder.toString();
   }
 
@@ -540,16 +484,6 @@ public class CnosDB implements IDatabase {
     } catch (Exception e) {
       LOGGER.error("Failed verify query, because " + e);
       return new Status(false, e, e.getMessage());
-    }
-  }
-
-  private static long getToNanoConst(String timePrecision) {
-    if (timePrecision.equals("ms")) {
-      return 1000000L;
-    } else if (timePrecision.equals("us")) {
-      return 1000L;
-    } else {
-      return 1L;
     }
   }
 }
