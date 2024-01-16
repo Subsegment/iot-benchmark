@@ -1,5 +1,7 @@
 package cn.edu.tsinghua.iot.benchmark.cnosdb;
 
+import cn.edu.tsinghua.iot.benchmark.conf.Config;
+import cn.edu.tsinghua.iot.benchmark.conf.ConfigDescriptor;
 import okhttp3.ConnectionPool;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -13,11 +15,13 @@ import java.util.concurrent.TimeUnit;
 
 public class CnosConnection {
   private final String url;
+  private static final Config config = ConfigDescriptor.getInstance().getConfig();
 
   OkHttpClient client;
 
   CnosConnection(String urlString, String cnosDbName) throws MalformedURLException {
-    ConnectionPool connectionPool = new ConnectionPool(100, 5, TimeUnit.MINUTES);
+    ConnectionPool connectionPool =
+        new ConnectionPool(config.getCLIENT_NUMBER(), 5, TimeUnit.MINUTES);
     client = new OkHttpClient().newBuilder().connectionPool(connectionPool).build();
     url = urlString + "/api/v1/sql?db=" + cnosDbName;
   }
