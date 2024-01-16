@@ -331,23 +331,6 @@ public class CnosDB extends InfluxDB implements IDatabase {
   }
 
   /**
-   * add time filter for query statements.
-   *
-   * @param sql sql header
-   * @param rangeQuery range query
-   * @return sql with time filter
-   */
-
-  /**
-   * add value filter for query statements.
-   *
-   * @param devices query device schema
-   * @param sqlHeader sql header
-   * @param valueThreshold lower bound of query value filter
-   * @return sql with value filter
-   */
-
-  /**
    * add group by clause for query.
    *
    * @param sqlHeader sql header
@@ -423,13 +406,6 @@ public class CnosDB extends InfluxDB implements IDatabase {
     builder.append(generateConstrainForDevices(devices));
     return builder.toString();
   }
-
-  /**
-   * generate from and where clause for specified devices.
-   *
-   * @param devices schema list of query devices
-   * @return from and where clause
-   */
 
   /**
    * Using in verification
